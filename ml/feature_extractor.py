@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import uuid
 import warnings
 import argparse
 import pickle as pk
@@ -20,10 +21,8 @@ sys.path.insert(0, "ml/networks")
 
 import deep_rank_net
 
-# from ml.networks import deep_rank_net
 
-
-# from kafkaservice import kafkaproducer
+from server.kafkaservice import kafkaproducer
 
 warnings.filterwarnings("ignore")
 
@@ -94,15 +93,14 @@ def get_deep(image):
     return deep_ft
 
 
-def extract_features(files):
-
+def extract_features(files, im_type):
     idx = list()
     hog_features = list()
     lbp_features = list()
     deep_features = list()
     start = time.time()
     for pic in files:
-        img = io.imread(pic, pilmode="RGB")
+        img = io.imread(pic.file, pilmode="RGB")
 
         img1 = resize(img, (227, 227, 3))
         img2 = rgb2gray(img1)
@@ -114,14 +112,16 @@ def extract_features(files):
         hog_features.append(hog_ft)
         lbp_features.append(lbp_ft)
         deep_features.append(deep_ft)
-        idx.append(pic)  # using the image filename as the index for the feature
+        idx.append(
+            pic.filename
+        )  # using the image filename as the index for the feature
 
     hog_matrix = np.array(hog_features)
     lbp_matrix = np.array(lbp_features)
     deep_matrix = np.array(deep_features)
 
     # Load pre-created PCA model to reduce hog features from 26244 to 59
-    with open("models/hog_pca.pkl", "rb") as f:
+    with open("ml/models/hog_pca.pkl", "rb") as f:
         hog_pca = pk.load(f)
     hog_components = hog_pca.transform(hog_matrix)
 
@@ -129,30 +129,19 @@ def extract_features(files):
     handcrafted = np.concatenate((hog_components, lbp_matrix), axis=1)
 
     # load handcrafted PCA
-    with open("models/handcrafted_pca.pkl", "rb") as g:
+    with open("ml/models/handcrafted_pca.pkl", "rb") as g:
         handcrafted_pca = pk.load(g)
     handcrafted_components = handcrafted_pca.transform(handcrafted)
     combined_features = np.concatenate((handcrafted_components, deep_matrix), axis=1)
-    end = time.time()
     df = pd.DataFrame(combined_features, index=idx).drop_duplicates()
 
-    df.index.rename("name", inplace=True)
-    data = json.loads(df.to_json(orient="table"))
-    data = data["data"]
-    names = list(map(lambda d: d.pop("name"), data))
-    producer_data = []
-    for index in range(len(names)):
-        producer_data.append({"name": names[index], "data": data[index]})
-    # kafkaproducer(producer_data, im_type)
-
-    # if im_type == "photos":
-    #     index_name = "photo_id"
-    # elif im_type == "matches":
-    #     index_name = "match_id"
-    # df.index.rename(index_name, inplace=True)
-
-    print(
-        "time taken extract features for {} images is {} seconds".format(
-            df.shape[0], end - start
-        )
-    )
+    if im_type == "photo":
+        index_name = "photo_id"
+    elif im_type == "matches":
+        index_name = "match_id"
+    df.index.rename(index_name, inplace=True)
+    df.reset_index(level=0, inplace=True)
+    # unique id passed to producer and to track consumer with this id
+    message_id = str(uuid.uuid4())
+    kafkaproducer(df.to_json(), im_type, message_id)
+    return message_id

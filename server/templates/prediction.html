@@ -1,0 +1,11 @@
+{% extends "base.html" %} {% block content %}
+<div>
+  <form action="/predict" method="post">
+    <label for="Photo Id">Photo ID</label>
+    <input type="text" name="photo_id" id="" />
+    <label for="matches_id">Matches ID</label>
+    <input type="text" name="matches_id" id="" />
+    <input type="submit" value="submit" />
+  </form>
+</div>
+{% endblock %}

@@ -1,7 +1,10 @@
 {% extends "base.html" %} {% block content %}
 <div>
   <form action="/" method="post" enctype="multipart/form-data">
-    <input type="file" name="photo" id="" multiple />
+    <label>Photo</label>
+    <input type="file" name="photo[]" id="" multiple />
+    <label>Matches</label>
+    <input type="file" name="matches[]" id="" multiple />
     <input type="submit" value="upload" />
   </form>
 </div>

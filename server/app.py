@@ -9,7 +9,7 @@ from server import settings, endpoints
 # fmt: off
 routes = [
     Route("/", endpoints.upload_photo, name="dashboard", methods=["GET", "POST"]),
-    Route("/api/infer", endpoints.infer, name="infer", methods=["POST"]),
+    Route("/predict", endpoints.infer, name="infer", methods=["GET", "POST"]),
     Route("/500", endpoints.error),
     Mount("/static", settings.statics, name="static"),
     

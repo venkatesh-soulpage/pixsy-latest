@@ -1,0 +1,35 @@
+# Version of docker-compose
+version: "3.4"
+
+# Containers we are going to run
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper:3.4.6
+    ports:
+      - "21811:21811"
+  kafka:
+    image: wurstmeister/kafka:2.11-2.0.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "29092:29092"
+    expose:
+      - "9093"
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka:9093,OUTSIDE://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
+      KAFKA_LISTENERS: INSIDE://0.0.0.0:9093,OUTSIDE://0.0.0.0:29092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  api:
+    image: pixsy
+    # The build parameters for this container.
+    # Here we define that it should build from the current directory
+    build:
+      context: ./
+    depends_on:
+      - "kafka"
+    ports:
+      - "9099:9099"
