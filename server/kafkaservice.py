@@ -12,7 +12,6 @@ TOPIC_NAME = "vectors"
 """ Kafka endpoints """
 
 
-# @socketio.on("kafkaconsumer", namespace="/kafka")
 def kafkaconsumer(photo_id, matches_id):
     consumer = KafkaConsumer(bootstrap_servers=BOOTSTRAP_SERVERS)
 
@@ -25,15 +24,6 @@ def kafkaconsumer(photo_id, matches_id):
     lastOffset = consumer.position(tp)
     consumer.seek_to_beginning(tp)
 
-    # consumer = KafkaConsumer(
-    #     TOPIC_NAME,
-    #     bootstrap_servers=BOOTSTRAP_SERVERS,
-    #     auto_offset_reset="earliest",
-    #     enable_auto_commit=True,
-    #     group_id="my-group-id",
-    #     value_deserializer=lambda x: json.loads(x.decode("utf-8")),
-    # )
-
     photo_data = None
     matches_data = None
     for message in consumer:
@@ -45,44 +35,11 @@ def kafkaconsumer(photo_id, matches_id):
             matches_data = message.get("data")
         if consumer_message.offset == lastOffset - 1:
             break
-
-        #     break
     consumer.close()
 
     return predict_data(photo_data, matches_data)
 
-    # print(message, "msg", message.offset, lastOffset)
-    # consumer_message = message
-    # message = json.loads(message.value)
 
-    # print(message.get("data"))
-
-    # if message.get("type") == "photos":
-    #     model_data = [
-    #         Photo(name=data.get("name"), data=data.get("data"))
-    #         for data in message.get("data")
-    #     ]
-    # elif message.get("type") == "matches":
-    #     model_data = [
-    #         Match(name=data.get("name"), data=data.get("data"))
-    #         for data in message.get("data")
-    #     ]
-    # elif message.get("type") == "prediction":
-    #     model_data = [
-    #         Prediction(
-    #             photo=data.get("photo"),
-    #             match=data.get("match"),
-    #             status=data.get("status"),
-    #             score=data.get("score"),
-    #         )
-    #         for data in message.get("data")
-    #     ]
-
-    # if consumer_message.offset == lastOffset - 1:
-    #     break
-
-
-# @socketio.on("kafkaproducer", namespace="/kafka")
 def kafkaproducer(data, im_type, message_id):
     producer = KafkaProducer(bootstrap_servers=BOOTSTRAP_SERVERS)
     message = {
@@ -93,7 +50,5 @@ def kafkaproducer(data, im_type, message_id):
 
     producer.send(TOPIC_NAME, json.dumps(message).encode("utf-8"))
     producer.flush()
-
-    # kafkaconsumer()
     producer.close()
     return None
