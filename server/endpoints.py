@@ -4,13 +4,15 @@ from starlette.requests import Request
 import io
 import uuid
 import logging
+import json
 from PIL import Image
 from skimage import io as skio
+from werkzeug.datastructures import ImmutableMultiDict
 
 
 from server.settings import templates
-from ml.feature_extractor import extract_features
-from werkzeug.datastructures import ImmutableMultiDict
+from ml import extract_features, predict_data
+
 from server.kafkaservice import kafkaconsumer
 
 
@@ -57,7 +59,7 @@ async def upload_photo(request):
             elif item[0] == "matches[]":
                 data["matches"].append(item[1])
         if len(data.get("photo")) > 0:
-            photo_id = extract_features(data["photo"], "photo")
+            photo_id = extract_features(data["photo"], "photos")
         else:
             photo_id = None
         if len(data.get("matches")) > 0:
@@ -73,11 +75,14 @@ async def infer(request):
     template = "prediction.html"
     context = {"request": request}
     if request.method == "POST":
+
         request_data = await request.form()
-        print(request_data)
+
+        if not request_data:
+            request_data = await request.json()
         data = kafkaconsumer(
             request_data.get("photo_id"), request_data.get("matches_id")
         )
-        return Response(data.to_html())
+        return JSONResponse(json.loads(data.to_json(orient="records")))
 
     return templates.TemplateResponse(template, context, status_code=200)

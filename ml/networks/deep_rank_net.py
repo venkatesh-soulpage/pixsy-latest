@@ -1,58 +1,21 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
+from torch.nn.functional import normalize as l2norm
+
 
 class AdaptiveConcatPool2d(nn.Module):
     "Concats `AdaptiveAvgPool2d` and `AdaptiveMaxPool2d`."
-    def __init__(self):
+
+    def __init__(self, k=1):
         super().__init__()
-        self.ap = nn.AdaptiveAvgPool2d(1)
-        self.mp = nn.AdaptiveMaxPool2d(1)
-
-    def forward(self, x): 
-        return torch.cat([self.mp(x), self.ap(x)], 1)
-
-class ConvNet(nn.Module):
-    """ConvNet using ResNet-101."""
-
-    def __init__(self):
-        """Initialize EmbeddingNet model."""
-        super(ConvNet, self).__init__()
-
-        self.resnet = models.resnet101(pretrained=True)
-        # changing the adaptive avg pooling layer to combined average and max pooling
-        self.resnet.avgpool = AdaptiveConcatPool2d()
-        #changing last FC layer from classification layer to 1024 feature embedding
-        self.resnet.fc = nn.Linear(4096, 128)
+        self.k = k
+        self.ap = nn.AdaptiveAvgPool2d(self.k)
+        self.mp = nn.AdaptiveMaxPool2d(self.k)
 
     def forward(self, x):
-        """Forward pass of ConvNet."""
-        out = self.resnet(x)
-        return out
+        return torch.cat([self.mp(x), self.ap(x)], 1)
 
-
-
-# class ConvNet(nn.Module):
-#     """EmbeddingNet using ResNet-101."""
-
-#     def __init__(self):
-#         """Initialize EmbeddingNet model."""
-#         super(ConvNet, self).__init__()
-
-#         # Everything except the last linear layer
-#         resnet = models.resnet101(pretrained=True)
-#         self.features = nn.Sequential(*list(resnet.children())[:-1])
-#         num_ftrs = resnet.fc.in_features
-#         self.fc1 = nn.Linear(num_ftrs, 128)
-
-#     def forward(self, x):
-#         """Forward pass of EmbeddingNet."""
-
-#         out = self.features(x)
-#         out = out.view(out.size(0), -1)
-#         out = self.fc1(out)
-
-#         return out
 
 class DeepRank(nn.Module):
     """
@@ -62,48 +25,24 @@ class DeepRank(nn.Module):
     def __init__(self):
         super(DeepRank, self).__init__()
 
-        self.conv_model = ConvNet()  # ResNet101
+        self.resnet_model = models.resnet18(pretrained=True)
+        # changing the adaptive avg pooling layer to combined average and max pooling
+        self.resnet_model.avgpool = AdaptiveConcatPool2d()
+        # self.conv_model.fc = nn.Identity()
+        self.resnet_model.fc = nn.Linear(in_features=(1024), out_features=512)
 
-        self.conv1 = torch.nn.Conv2d(in_channels=3, out_channels=96, kernel_size=8, padding=1,
-                                     stride=16)  # 1st sub sampling
-        self.maxpool1 = torch.nn.MaxPool2d(kernel_size=3, stride=4, padding=1)
+    def forward_one(self, X):
 
-        self.conv2 = torch.nn.Conv2d(in_channels=3, out_channels=96, kernel_size=8, padding=4,
-                                     stride=32)  # 2nd sub sampling
-        self.maxpool2 = torch.nn.MaxPool2d(kernel_size=7, stride=2, padding=3)
+        resnet_input = self.resnet_model(X)
+        resnet_input = torch.flatten(resnet_input, start_dim=1)
+        ### check scores with l2 norm ###
+        # resnet_input = l2norm(resnet_input, p=2, dim=1)
+        return resnet_input
 
-        self.shrink_layer = torch.nn.Linear(in_features=1536,out_features=64)
+    def forward(self, q, p, n):
 
-        self.dense_layer = torch.nn.Linear(in_features=(128 + 128), out_features=64)
+        Q = self.forward_one(q)
+        P = self.forward_one(p)
+        N = self.forward_one(n)
 
-    def forward(self, X):
-        conv_input = self.conv_model(X)
-        conv_norm = conv_input.norm(p=2, dim=1, keepdim=True)
-        conv_input = conv_input.div(conv_norm.expand_as(conv_input))
-
-        first_input = self.conv1(X)
-        first_input = self.maxpool1(first_input)
-        first_input = first_input.view(first_input.size(0), -1)
-        first_input = self.shrink_layer(first_input)
-        first_norm = first_input.norm(p=2, dim=1, keepdim=True)
-        first_input = first_input.div(first_norm.expand_as(first_input))
-
-        second_input = self.conv2(X)
-        second_input = self.maxpool2(second_input)
-        second_input = second_input.view(second_input.size(0), -1)
-        second_input = self.shrink_layer(second_input)
-        second_norm = second_input.norm(p=2, dim=1, keepdim=True)
-        second_input = second_input.div(second_norm.expand_as(second_input))
-
-        merge_subsample = torch.cat([first_input, second_input], 1)  # batch x (128)
-
-        merge_conv = torch.cat([merge_subsample, conv_input], 1)  # batch x (128 + 128)
-
-        final_input = self.dense_layer(merge_conv)
-        final_norm = final_input.norm(p=2, dim=1, keepdim=True)
-        final_input = final_input.div(final_norm.expand_as(final_input))
-
-        return final_input
-# im = torch.randn(1,3,225,225)
-# net = DeepRank()
-# print(net.forward(im).shape)
+        return Q, P, N

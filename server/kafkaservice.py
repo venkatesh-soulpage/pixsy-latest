@@ -2,7 +2,7 @@ import json
 
 from kafka import KafkaProducer, KafkaConsumer, TopicPartition
 import uuid
-from ml import predict_data
+from ml.predictor import predict_data
 
 # BOOTSTRAP_SERVERS = "kafka:9093"
 BOOTSTRAP_SERVERS = "localhost:9092"
