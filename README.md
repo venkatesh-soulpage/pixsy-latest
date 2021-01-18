@@ -59,3 +59,13 @@ Response:
   }
 ]
 ```
+
+To start using Docker
+
+To build a Image: `docker-compose build`
+
+To run a Image: `docker-compose up`
+
+or
+
+To run Image in background: `docker-compose up -d`
